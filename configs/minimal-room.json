@@ -1,0 +1,11 @@
+{
+  "scene_id": "occluded-radiator-v1",
+  "frame_id": "world",
+  "room_size_m": [6, 6, 3],
+  "initial_camera": {"frame_id":"world", "position_m":[0,-2,1.5], "orientation_xyzw":[0.7071067811865475,0,0,0.7071067811865476]},
+  "objects": [
+    {"object_id":"screen", "geometry":{"pose":{"frame_id":"world","position_m":[0,0,1],"orientation_xyzw":[0,0,0,1]},"size_m":[1.4,0.15,2]},"color":[65,110,175]},
+    {"object_id":"radiator", "geometry":{"pose":{"frame_id":"world","position_m":[0,1,0.5],"orientation_xyzw":[0,0,0,1]},"size_m":[1,0.4,1]},"color":[200,70,55]},
+    {"object_id":"desk", "geometry":{"pose":{"frame_id":"world","position_m":[-1.8,1,0.4],"orientation_xyzw":[0,0,0,1]},"size_m":[1.2,0.7,0.8]},"color":[165,120,70]}
+  ]
+}

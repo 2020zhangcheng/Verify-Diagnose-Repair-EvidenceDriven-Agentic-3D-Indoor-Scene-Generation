@@ -1,0 +1,132 @@
+{
+  "task_id": "8f722c67-3ded-4fd2-b8ec-591b9a4b373f",
+  "event_replay_matches": true,
+  "status": "finished",
+  "real_module": "SceneBeliefService",
+  "mock_modules": [
+    "Observation source",
+    "LayoutPlanner",
+    "CriticalUnknownDetector",
+    "ViewGenerator",
+    "ViewSelector",
+    "GeometryVerifier",
+    "Action",
+    "Memory"
+  ],
+  "snapshots": [
+    {
+      "version": 1,
+      "fusion_version": "scene-belief-v1:99db5fc19f5af3b43d2d509b85918bce7c254b6262be0bcbc3dd6e2b0b4b2e9c",
+      "desk_position": [
+        0.0,
+        0.5,
+        0.37499999999999994
+      ],
+      "desk_uncertainty": {
+        "aggregate": 0.25,
+        "visibility": 0.5,
+        "schema_version": 1,
+        "occlusion_ratio": 0.5,
+        "estimator_version": "scene-belief-v1:99db5fc19f5af3b43d2d509b85918bce7c254b6262be0bcbc3dd6e2b0b4b2e9c",
+        "observation_count": 1,
+        "geometry_confidence": 0.7,
+        "semantic_confidence": 0.85,
+        "geometry_uncertainty": 0.3,
+        "cross_view_inconsistency": 0.0
+      },
+      "regions": {
+        "behind-cabinet": "unobserved",
+        "window-region": "occluded"
+      },
+      "window_claim": {
+        "unit": null,
+        "value": null,
+        "status": "uncertain",
+        "claim_id": "window-space-empty",
+        "evidence": [
+          {
+            "artifact_id": null,
+            "camera_view_id": "a82da535-c5f9-4b5a-961e-198eea06820c:observe_scene:0:camera",
+            "observation_id": "a82da535-c5f9-4b5a-961e-198eea06820c:observe_scene:0:obs",
+            "schema_version": 1
+          }
+        ],
+        "predicate": "is_empty",
+        "confidence": 0.4,
+        "subject_id": "window-region",
+        "schema_version": 1
+      },
+      "evidence": [
+        {
+          "artifact_id": null,
+          "camera_view_id": "a82da535-c5f9-4b5a-961e-198eea06820c:observe_scene:0:camera",
+          "observation_id": "a82da535-c5f9-4b5a-961e-198eea06820c:observe_scene:0:obs",
+          "schema_version": 1
+        }
+      ]
+    },
+    {
+      "version": 2,
+      "fusion_version": "scene-belief-v1:99db5fc19f5af3b43d2d509b85918bce7c254b6262be0bcbc3dd6e2b0b4b2e9c",
+      "desk_position": [
+        0.022500000000000003,
+        0.5,
+        0.37499999999999994
+      ],
+      "desk_uncertainty": {
+        "aggregate": 0.15200000000000002,
+        "visibility": 0.9,
+        "schema_version": 1,
+        "occlusion_ratio": 0.1,
+        "estimator_version": "scene-belief-v1:99db5fc19f5af3b43d2d509b85918bce7c254b6262be0bcbc3dd6e2b0b4b2e9c",
+        "observation_count": 2,
+        "geometry_confidence": 0.8,
+        "semantic_confidence": 0.8999999999999999,
+        "geometry_uncertainty": 0.2,
+        "cross_view_inconsistency": 0.16
+      },
+      "regions": {
+        "behind-cabinet": "unobserved",
+        "window-region": "free"
+      },
+      "window_claim": {
+        "unit": null,
+        "value": true,
+        "status": "supported",
+        "claim_id": "window-space-empty",
+        "evidence": [
+          {
+            "artifact_id": null,
+            "camera_view_id": "a82da535-c5f9-4b5a-961e-198eea06820c:observe_scene:0:camera",
+            "observation_id": "a82da535-c5f9-4b5a-961e-198eea06820c:observe_scene:0:obs",
+            "schema_version": 1
+          },
+          {
+            "artifact_id": null,
+            "camera_view_id": "a82da535-c5f9-4b5a-961e-198eea06820c:generate_candidate_views:1:view-0:executed",
+            "observation_id": "a82da535-c5f9-4b5a-961e-198eea06820c:observe_scene:1:obs",
+            "schema_version": 1
+          }
+        ],
+        "predicate": "is_empty",
+        "confidence": 0.95,
+        "subject_id": "window-region",
+        "schema_version": 1
+      },
+      "evidence": [
+        {
+          "artifact_id": null,
+          "camera_view_id": "a82da535-c5f9-4b5a-961e-198eea06820c:observe_scene:0:camera",
+          "observation_id": "a82da535-c5f9-4b5a-961e-198eea06820c:observe_scene:0:obs",
+          "schema_version": 1
+        },
+        {
+          "artifact_id": null,
+          "camera_view_id": "a82da535-c5f9-4b5a-961e-198eea06820c:generate_candidate_views:1:view-0:executed",
+          "observation_id": "a82da535-c5f9-4b5a-961e-198eea06820c:observe_scene:1:obs",
+          "schema_version": 1
+        }
+      ]
+    }
+  ]
+}

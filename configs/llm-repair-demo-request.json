@@ -1,0 +1,79 @@
+{
+  "scene": {
+    "scene_id": "controlled-corruption-demo",
+    "objects": [
+      {
+        "object_id": "chair_a",
+        "position_m": [
+          0,
+          0,
+          0.5
+        ],
+        "size_m": [
+          1,
+          1,
+          1
+        ],
+        "support_id": "floor"
+      },
+      {
+        "object_id": "chair_b",
+        "position_m": [
+          0.8,
+          0,
+          0.5
+        ],
+        "size_m": [
+          1,
+          1,
+          1
+        ],
+        "support_id": "floor"
+      },
+      {
+        "object_id": "floating_box",
+        "position_m": [
+          3,
+          0,
+          1
+        ],
+        "size_m": [
+          0.5,
+          0.5,
+          0.5
+        ],
+        "support_id": "floor"
+      },
+      {
+        "object_id": "pedestal",
+        "position_m": [
+          -3,
+          0,
+          0.5
+        ],
+        "size_m": [
+          1,
+          1,
+          1
+        ],
+        "support_id": "floor",
+        "movable": false
+      },
+      {
+        "object_id": "vase",
+        "position_m": [
+          -2.4,
+          0,
+          1.25
+        ],
+        "size_m": [
+          0.5,
+          0.5,
+          0.5
+        ],
+        "support_id": "pedestal"
+      }
+    ]
+  },
+  "max_iterations": 5
+}

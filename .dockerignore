@@ -1,0 +1,11 @@
+.venv
+.git
+__pycache__
+.pytest_cache
+.env
+.DS_Store
+
+*.egg-info
+
+outputs
+tmp

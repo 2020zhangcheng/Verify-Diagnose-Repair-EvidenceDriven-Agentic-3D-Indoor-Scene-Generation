@@ -1,0 +1,9 @@
+{
+  "penetration_tolerance_m": 0.000001,
+  "contact_tolerance_m": 0.001,
+  "minimum_support_margin_m": 0.001,
+  "axis_tolerance": 0.000000001,
+  "severity_scale_m": 0.1,
+  "maximum_move_m": 2.0,
+  "maximum_iterations": 20
+}
