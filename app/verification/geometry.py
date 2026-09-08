@@ -86,7 +86,13 @@ class DeterministicGeometryVerifier:
                 ((obj.object_id,(0,0,depth)),) if depth>config.penetration_tolerance_m else ())
             if obj.anchored or not obj.requires_support:
                 continue
-            support = objects.get(obj.support_id)
+            # ``floor`` is a virtual support and ``None`` means that the
+            # support intent is missing.  Only real object IDs belong in the
+            # object lookup; keeping the optional value out of ``dict.get``
+            # also makes this boundary safe for static type checkers.
+            support = None
+            if obj.support_id is not None and obj.support_id != 'floor':
+                support = objects.get(obj.support_id)
             ids = (obj.object_id,) if obj.support_id is None else (obj.object_id,obj.support_id)
             if obj.support_id is None or (obj.support_id != 'floor' and support is None):
                 local[obj.object_id] = add('support',ids,'unknown' if obj.support_id is None else 'fail',
