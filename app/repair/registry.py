@@ -10,6 +10,7 @@ from app.repair.tools import (
     DeterministicRepairTool,
     DeterministicToolError,
     RepairBoundaryTool,
+    RepairClearanceTool,
     RepairSupportContactTool,
     ResolveCollisionTool,
     StabilizeSupportTool,
@@ -106,7 +107,7 @@ def default_repair_tool_registry(config=None) -> RepairToolRegistry:
             RepairSupportContactTool(tool_config),
             StabilizeSupportTool(tool_config),
             RepairBoundaryTool(tool_config),
-            UnsupportedTool("repair_clearance", {"door_clearance", "path_blocked", "spacing_too_small"}),
+            RepairClearanceTool(tool_config),
             UnsupportedTool("repair_orientation", {"orientation", "upright", "normal_mismatch"}),
         )
     )

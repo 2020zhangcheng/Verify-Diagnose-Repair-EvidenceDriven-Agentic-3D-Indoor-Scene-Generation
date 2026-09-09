@@ -65,16 +65,27 @@ class GeometryRepairRouter:
 
         return self.registry.schemas
 
-    def _context(self, scene: SceneSnapshot, report: DiagnosisReport, history) -> dict[str, Any]:
+    def _context(
+        self,
+        scene: SceneSnapshot,
+        report: DiagnosisReport,
+        history,
+        user_message: str | None = None,
+    ) -> dict[str, Any]:
         diagnostics = []
         for item in sorted(
             (diagnostic for diagnostic in report.diagnostics if diagnostic.status == "fail"),
             key=lambda diagnostic: (-diagnostic.severity, diagnostic.diagnosis_id),
         ):
             diagnostic = item.model_dump(mode="json")
+            # Diagnosis keeps numeric candidate solutions for audit and
+            # deterministic replay.  The planner receives the diagnosis and
+            # the tool contract, but never gets a free-form delta API.
+            diagnostic.pop("suggestions", None)
+            diagnostic.pop("editable_variables", None)
             diagnostics.append(diagnostic)
         schemas = self.registry.schemas
-        return {
+        context = {
             "scene_revision": report.scene_revision,
             # IDs and editability are useful context; numeric poses/sizes stay
             # behind the deterministic solver so the planner cannot turn the
@@ -95,6 +106,9 @@ class GeometryRepairRouter:
             "tools": schemas,
             "repair_history": list(history)[-12:],
         }
+        if user_message:
+            context["user_message"] = user_message
+        return context
 
     @staticmethod
     def _arguments(value: Any) -> dict[str, Any]:
@@ -152,10 +166,16 @@ class GeometryRepairRouter:
             reason_code=reason_code if isinstance(reason_code, str) else "STRUCTURED_SELECTION",
         )
 
-    def route(self, scene: SceneSnapshot, report: DiagnosisReport, history=()) -> RepairToolSelection:
+    def route(
+        self,
+        scene: SceneSnapshot,
+        report: DiagnosisReport,
+        history=(),
+        user_message: str | None = None,
+    ) -> RepairToolSelection:
         self.calls += 1
         call_id = f"geometry-router-{self.calls}"
-        context = self._context(scene, report, history)
+        context = self._context(scene, report, history, user_message)
         body = {
             "model": self.settings.model,
             "messages": [

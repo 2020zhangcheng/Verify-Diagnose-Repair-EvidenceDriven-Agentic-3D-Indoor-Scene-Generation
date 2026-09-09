@@ -118,6 +118,7 @@ def _route_tool(
     router_holder: dict[str, GeometryRepairRouter | None],
     registry: RepairToolRegistry,
     emit: Callable[[str, dict[str, Any]], None],
+    user_message: str | None = None,
 ) -> str:
     """Ask the LLM to choose one allow-listed tool for the current diagnosis."""
 
@@ -142,7 +143,12 @@ def _route_tool(
     if router_holder["value"] is None:
         router_holder["value"] = GeometryRepairRouter(registry=registry, emit=emit)
     try:
-        selection = router_holder["value"].route(state["scene"], report, state.get("history", []))
+        selection = router_holder["value"].route(
+            state["scene"],
+            report,
+            state.get("history", []),
+            user_message=user_message,
+        )
     except LLMRepairError:
         raise
     except Exception as exc:
@@ -359,6 +365,7 @@ def run_repair_loop(
     registry: RepairToolRegistry | None = None,
     max_iterations: int | None = None,
     emit: Callable[[str, dict[str, Any]], None] | None = None,
+    user_message: str | None = None,
 ) -> RepairResult:
     """Run the explicit Geometry Critic → ReAct Tool loop.
 
@@ -390,7 +397,13 @@ def run_repair_loop(
             _mark_blocked(state, event_sink)
             break
 
-        route_transition = _route_tool(state, router_holder, tool_registry, event_sink)
+        route_transition = _route_tool(
+            state,
+            router_holder,
+            tool_registry,
+            event_sink,
+            user_message=user_message,
+        )
         if route_transition == "iteration_limit":
             _mark_iteration_limit(state, event_sink)
             break

@@ -9,6 +9,7 @@ from app.repair.catalog import allowed_repair_tools_for
 from app.verification.models import (
     Diagnostic,
     DiagnosisReport,
+    MovePrescription,
     SceneSnapshot,
     VerifierConfig,
     fingerprint,
@@ -69,10 +70,17 @@ class DeterministicGeometryVerifier:
         diagnostics: list[Diagnostic] = []
         objects = {obj.object_id: obj for obj in scene.objects}
 
-        def add(rule, ids, status, reason, measurements, amount=0):
+        def add(rule, ids, status, reason, measurements, amount=0, suggestions=()):
             diagnosis_id = rule + ":" + ",".join(ids)
             editable = tuple(object_id for object_id in ids if object_id in objects and objects[object_id].movable)
             locked = tuple(object_id for object_id in ids if object_id in objects and not objects[object_id].movable)
+            # Keep the public diagnosis compact while retaining the smallest
+            # deterministic candidates for audit and replay.
+            moves = tuple(
+                MovePrescription(object_id=object_id, delta_m=delta, diagnosis_id=diagnosis_id)
+                for object_id, delta in suggestions
+                if object_id in objects and objects[object_id].movable
+            )[:8]
             allowed = allowed_repair_tools_for(
                 rule,
                 status,
@@ -87,6 +95,8 @@ class DeterministicGeometryVerifier:
                 reason=reason,
                 measurements=measurements,
                 severity=min(1, max(0, amount) / config.severity_scale_m),
+                editable_variables=tuple(f"{object_id}.position_m" for object_id in editable),
+                suggestions=moves,
                 editable_objects=editable,
                 locked_objects=locked,
                 allowed_repair_tools=allowed,
@@ -115,6 +125,14 @@ class DeterministicGeometryVerifier:
                     "tolerance_m": config.penetration_tolerance_m,
                 },
                 solutions[0][0] if solutions else 0,
+                tuple(
+                    candidate
+                    for _, delta in (solutions or ())
+                    for candidate in (
+                        (first.object_id, delta),
+                        (second.object_id, tuple(-value for value in delta)),
+                    )
+                ),
             )
 
         local: dict[str, Diagnostic] = {}
@@ -131,6 +149,7 @@ class DeterministicGeometryVerifier:
                     "tolerance_m": config.penetration_tolerance_m,
                 },
                 max(0, depth),
+                ((obj.object_id, (0.0, 0.0, depth)),) if depth > config.penetration_tolerance_m else (),
             )
             if obj.anchored or not obj.requires_support:
                 continue
@@ -203,6 +222,14 @@ class DeterministicGeometryVerifier:
                 reason,
                 measurements,
                 0 if valid else max(abs(gap), max(0, config.minimum_support_margin_m - (margin or 0))),
+                ((
+                    obj.object_id,
+                    (
+                        dx if not good_margin or area <= 0 else 0.0,
+                        dy if not good_margin or area <= 0 else 0.0,
+                        -gap,
+                    ),
+                ),) if not valid else (),
             )
 
         def grounded(object_id, seen):

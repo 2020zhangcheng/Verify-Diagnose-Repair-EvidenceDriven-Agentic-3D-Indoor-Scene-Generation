@@ -4,11 +4,14 @@
 
 修复流程是一个显式、有界的 ReAct 循环：
 
-1. `Geometry Critic` 对当前不可变 `SceneSnapshot` 生成结构化诊断。
+1. 用户消息和不可变 `SceneSnapshot` 进入显式 ReAct 循环；`Geometry Critic`
+   先生成结构化 Diagnosis。若几何通过且场景声明了 affordance/functional
+   relation，再由 Functional Critic 生成第二层 Diagnosis。
 2. `GeometryRepairRouter` 将失败诊断 JSON 和完整八项 `tools` 列表一起发送给 LLM。
 3. LLM 只能选择一个允许的 tool、诊断 ID、目标对象和策略。
-4. `RepairToolRegistry` 校验选择，确定性 tool 根据几何证据计算变换。
-5. 执行后立即重新验证；不通过时回到 Critic，重新诊断和选 tool。
+4. `RepairToolRegistry` 校验选择，确定性 tool/function 根据几何或功能证据计算变换。
+5. 执行后立即由确定性 Geometry/Functional function 重新验证；不通过时回到
+   Critic，重新诊断和选 tool。
 6. 新违规或严重度没有改善时回滚本轮动作，再回到 Critic。
 7. PASS、阻塞或达到 10 轮时结束。
 
@@ -23,8 +26,8 @@
 - user message 中的 `tools` JSON 列表。
 
 user message 还包含当前 `scene_revision`、场景对象的可移动性/支撑关系、失败
-诊断和最近修复历史。模型不接收用于自由编辑的位移参数，确定性 tool 计算
-`delta_m` 或目标姿态。
+诊断、用户消息和最近修复历史。Diagnosis 对外保留 `MovePrescription` 数学候选
+解，但模型请求会去除其中的数值位移；确定性 tool 重新计算 `delta_m` 或目标姿态。
 
 Registry 会拒绝未知工具、非失败诊断、Critic 未允许的工具、锁定对象、错误
 目标字段和过期场景版本。`verify_scene` 与 `rollback_repair` 是协议中的控制

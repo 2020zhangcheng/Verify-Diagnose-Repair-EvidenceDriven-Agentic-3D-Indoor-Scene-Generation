@@ -3,7 +3,7 @@
 RoomScout 的 HTTP 入口是 Geometry Critic 修复闭环，同时保留独立的场景信念、
 模拟环境和感知数学模型：
 
-`Geometry Critic → LLM 选择 tool → 确定性 tool 执行 → 验证`
+`用户消息 → Geometry Diagnosis → LLM 选择 tool → 确定性 function/tool 执行 → Geometry/Functional 验证`
 
 ReAct 循环由普通 Python `while` 循环显式编排，最多执行 10 轮。LLM 只能从
 Geometry Critic 给出的允许列表中选择工具、对象和策略；位移、姿态和最终
@@ -48,7 +48,8 @@ curl -X POST http://localhost:8000/geometry/repair \
 
 请求中的 `scene` 也可以直接使用对象列表；每个对象至少包含
 `object_id`、`position_m`、`size_m` 和 `support_id`。`max_iterations` 范围为
-1–10，默认 10。
+1–10，默认 10。可选的 `message` 会作为本次任务意图传给 LLM；场景几何仍由
+`scene` 提供。
 
 响应包含 `run_id`、最终 `result` 和事件查询地址：
 
@@ -60,7 +61,7 @@ curl -H 'Authorization: Bearer roomscout-local-demo' \
 事件和幂等记录使用线程安全的进程内内存存储。服务重启或多进程部署后，历史
 记录不会保留；这是当前单进程内存版的明确边界。
 
-## 八个工具
+## Diagnosis、Functional Critic 与八个工具
 
 工具定义位于 `app/repair/catalog.py`，确定性实现位于 `app/repair/tools.py`：
 
@@ -75,14 +76,18 @@ curl -H 'Authorization: Bearer roomscout-local-demo' \
 
 其中 `verify_scene` 和 `rollback_repair` 由 ReAct 循环控制，LLM 不能直接调用。
 当前盒体 V1 数据只实现了碰撞、支撑和地面边界的确定性修复；未实现的能力会
-被安全拒绝，不会让模型自行编造坐标。
+被安全拒绝，不会让模型自行编造坐标。带 `affordance` 的场景还会经过
+`app/verification/functional.py` 的 Functional Critic；它按导航、接近、功能净空、
+操作扫掠和对象关系生成 Diagnosis。`suggestions`/`MovePrescription` 是诊断层的
+数学候选解，LLM 不会直接执行其中的数值位移。
 
 ## 数学建模模块
 
 以下模块是纯 Python、无外部服务依赖的确定性模型：
 
-- `app/contracts/models.py`：场景、观测、信念、约束和验证合同。
+- `app/contracts/models.py`：场景、Affordance、Diagnosis、观测、信念、约束和验证合同。
 - `app/environment/geometry.py`：四元数坐标轴、OBB/SAT、射线盒体相交和房间边界。
+- `app/verification/functional.py`：可选 Functional Critic 和 Geometry/Functional 联合诊断。
 - `app/environment/minimal.py`：相机移动、RGB/深度生成、遮挡、碰撞和会话幂等。
 - `app/perception/simulation.py`：基于模拟真值的结构化观测生成。
 - `app/scene/geometry.py`、`app/scene/belief.py`：跨视角盒体融合、冲突检测、证据

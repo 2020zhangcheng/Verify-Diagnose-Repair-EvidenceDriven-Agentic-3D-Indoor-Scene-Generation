@@ -7,6 +7,7 @@ from pathlib import Path
 
 from app.repair.models import RepairResult, RepairToolSelection
 from app.repair.registry import default_repair_tool_registry
+from app.verification.functional import FunctionalCritic, GeometryFunctionalCritic
 from app.verification.geometry import DeterministicGeometryVerifier
 from app.verification.models import SceneSnapshot, VerifierConfig
 
@@ -30,7 +31,14 @@ def replay_journal(path):
         kind = row["type"]
         payload = row["payload"]
         if kind == "CONFIG":
-            verifier = DeterministicGeometryVerifier(VerifierConfig.model_validate(payload["config"]))
+            geometry_verifier = DeterministicGeometryVerifier(VerifierConfig.model_validate(payload["config"]))
+            if payload.get("functional_verifier_version"):
+                functional_verifier = FunctionalCritic()
+                if functional_verifier.version != payload["functional_verifier_version"]:
+                    raise ValueError("functional configuration hash mismatch")
+                verifier = GeometryFunctionalCritic(geometry_verifier, functional_verifier)
+            else:
+                verifier = geometry_verifier
             if verifier.version != payload["version"]:
                 raise ValueError("configuration hash mismatch")
             registry = default_repair_tool_registry(verifier.config)

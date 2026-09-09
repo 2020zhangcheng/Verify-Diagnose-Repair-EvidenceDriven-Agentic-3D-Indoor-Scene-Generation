@@ -1,7 +1,8 @@
 # 数学建模层
 
-仓库现在同时包含两条相互独立的确定性模型：Geometry Critic 修复模型和
-SceneBelief 感知融合模型。它们都是本地 Python 模块，不需要外部服务。
+仓库现在包含三类确定性数学模型：Geometry Critic 修复模型、可选的
+Functional Critic 功能可用性模型和 SceneBelief 感知融合模型。它们都是本地
+Python 模块，不需要外部服务。
 
 ## 几何模型
 
@@ -21,6 +22,17 @@ SceneBelief 感知融合模型。它们都是本地 Python 模块，不需要外
 
 实现位置：`app/environment/geometry.py`、`app/verification/geometry.py`、
 `app/repair/tools.py`。
+
+## 功能模型
+
+带 `affordance` 或 `functional_relations` 的场景会在 Geometry Critic 通过后
+进入 `FunctionalCritic`。它用人体导航圆柱、交互锚点、接近距离/朝向、功能净空、
+操作扫掠和对象关系构造确定性 Diagnosis；功能通过表示至少存在一个满足当前
+V1 约束的交互姿态。功能修复不能绕过 Geometry Critic，修复后会重新执行两层
+诊断。没有功能描述的旧场景不会被强制判为 UNKNOWN。
+
+实现位置：`app/verification/functional.py`、`app/verification/models.py`、
+`configs/functional-verifier-v1.json`。
 
 ## 场景信念与不确定性模型
 

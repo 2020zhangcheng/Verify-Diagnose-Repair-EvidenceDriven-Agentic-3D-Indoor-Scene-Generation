@@ -11,6 +11,7 @@ from app.contracts.models import Contract
 from app.repair.loop import run_repair_loop
 from app.repair.registry import default_repair_tool_registry
 from app.repair.router import GeometryRepairRouter
+from app.verification.functional import FunctionalCritic, GeometryFunctionalCritic
 from app.verification.geometry import DeterministicGeometryVerifier, load_config
 from app.verification.io import parse_snapshot
 from app.verification.llm import LLMRepairError, LLMSettings
@@ -23,6 +24,7 @@ geometry_store = InMemoryGeometryStore()
 
 
 class RepairRequest(Contract):
+    message: str | None = Field(default=None, max_length=4000)
     scene: SceneSnapshot
     max_iterations: int = Field(default=10, ge=1, le=10)
 
@@ -88,18 +90,23 @@ def open_run(body: RepairRequest, user: str, idempotency_key: str, config: LLMSe
 
 def _run_repair(body: RepairRequest, run, config: LLMSettings):
     journal = InMemoryGeometryJournal(geometry_store, run.id)
-    verifier = DeterministicGeometryVerifier(
+    geometry_verifier = DeterministicGeometryVerifier(
         load_config().model_copy(update={"maximum_iterations": body.max_iterations})
     )
-    registry = default_repair_tool_registry(verifier.config)
+    verifier = GeometryFunctionalCritic(
+        geometry_verifier=geometry_verifier,
+        functional_verifier=FunctionalCritic(),
+    )
+    registry = default_repair_tool_registry(geometry_verifier.config)
     journal.emit(
         "CONFIG",
         {
-            "config": verifier.config.model_dump(mode="json"),
+            "config": geometry_verifier.config.model_dump(mode="json"),
             "version": verifier.version,
             "policy": "explicit-react-tool-routing-v1",
             "tools": [tool["function"]["name"] for tool in registry.schemas],
             "llm": config.public(),
+            "functional_verifier_version": verifier.functional_verifier.version,
         },
     )
     router_client = GeometryRepairRouter(config, emit=journal.emit, registry=registry)
@@ -110,6 +117,7 @@ def _run_repair(body: RepairRequest, run, config: LLMSettings):
         registry=registry,
         max_iterations=body.max_iterations,
         emit=journal.emit,
+        user_message=body.message,
     )
 
 

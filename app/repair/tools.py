@@ -323,6 +323,66 @@ class RepairBoundaryTool(DeterministicRepairTool):
         )
 
 
+class RepairClearanceTool(DeterministicRepairTool):
+    """Search deterministic semantic moves for an optional functional failure."""
+
+    name = "repair_clearance"
+    _functional_rules = {
+        "door_clearance",
+        "path_blocked",
+        "spacing_too_small",
+        "functional_navigation",
+        "functional_approach",
+        "functional_clearance",
+        "operation_sweep_blocked",
+        "reach_unavailable",
+        "functional_relation",
+    }
+
+    def __init__(self, config: ToolConfig):
+        self.config = config
+
+    def can_handle(self, diagnosis: Diagnostic) -> bool:
+        return diagnosis.rule_id in self._functional_rules and super().can_handle(diagnosis)
+
+    def solve(self, scene, diagnosis, request):
+        self._check_revision(scene, request)
+        self._check_diagnosis(diagnosis, request)
+        if diagnosis.rule_id in {"door_clearance", "path_blocked", "spacing_too_small"}:
+            raise DeterministicToolError("repair_clearance_solver_not_available")
+        object_id = self._target_id(request, movable=True)
+        if object_id not in diagnosis.editable_objects:
+            raise DeterministicToolError("object_not_editable_for_diagnosis")
+
+        # The solver proposes semantic search directions only.  Each candidate
+        # is independently checked by the Functional Critic before acceptance.
+        from app.verification.functional import FunctionalCritic, _candidate_move_deltas
+
+        critic = FunctionalCritic()
+        for delta in _candidate_move_deltas(scene, diagnosis, object_id):
+            self._bounded(delta, self.config.maximum_move_m)
+            target = self._object(scene, object_id)
+            after = target.geometry.pose.model_copy(
+                update={"position_m": tuple(a + b for a, b in zip(target.geometry.pose.position_m, delta))}
+            )
+            candidate = self._apply_pose(scene, object_id, after)
+            checked = critic.diagnose(candidate)
+            matching = next(
+                (item for item in checked.diagnostics if item.diagnosis_id == diagnosis.diagnosis_id),
+                None,
+            )
+            if matching is not None and matching.status == "pass":
+                return self._outcome(
+                    scene,
+                    diagnosis,
+                    object_id,
+                    after,
+                    delta_m=delta,
+                    reason_code="FUNCTIONAL_CLEARANCE_SEARCH",
+                )
+        raise DeterministicToolError("functional_clearance_solver_exhausted")
+
+
 class UnsupportedTool(DeterministicRepairTool):
     """Catalogued tools whose solver data is outside the current box model."""
 

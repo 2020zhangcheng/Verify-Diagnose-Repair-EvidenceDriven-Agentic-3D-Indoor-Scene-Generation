@@ -214,8 +214,18 @@ def allowed_repair_tools_for(
         return ("stabilize_support",)
     if rule_id in {"out_of_room", "wall_penetration"}:
         return ("repair_boundary",)
-    if rule_id in {"door_clearance", "path_blocked", "spacing_too_small"}:
+    if rule_id in {
+        "door_clearance",
+        "path_blocked",
+        "spacing_too_small",
+        "functional_navigation",
+        "functional_approach",
+        "functional_clearance",
+        "operation_sweep_blocked",
+        "reach_unavailable",
+        "functional_relation",
+    }:
         return ("repair_clearance",)
-    if rule_id in {"orientation", "upright", "normal_mismatch"}:
+    if rule_id in {"orientation", "upright", "normal_mismatch", "functional_orientation"}:
         return ("repair_orientation",)
     return ()

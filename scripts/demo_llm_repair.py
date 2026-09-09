@@ -14,6 +14,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--api", default="http://127.0.0.1:8000")
     parser.add_argument("--input", default="configs/geometry-react-bad-demo.json")
+    parser.add_argument("--message", default=None)
     parser.add_argument("--max-iterations", type=int, default=10)
     parser.add_argument("--idempotency-key", default=None)
     parser.add_argument("--output", default=None)
@@ -28,6 +29,8 @@ def main():
         "scene": json.loads(Path(args.input).read_text()),
         "max_iterations": args.max_iterations,
     }
+    if args.message is not None:
+        body["message"] = args.message
     with httpx.Client(timeout=1800, follow_redirects=False) as client:
         response = client.post(args.api.rstrip("/") + "/geometry/repair", headers=headers, json=body)
 
