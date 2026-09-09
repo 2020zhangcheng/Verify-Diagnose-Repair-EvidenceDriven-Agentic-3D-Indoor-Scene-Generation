@@ -38,6 +38,17 @@ docker compose exec -T api python scripts/demo.py
 
 脚本在容器内调用 localhost:8000。输出包含任务 ID、final_result、全部事件和 trace 节点数。终态必须是 `finished`，`final_result.mode` 是 `fake-v0`。
 
+Geometry Critic 工具路由闭环：`POST /geometry/repair-graph`。它使用显式
+ReAct 循环编排 `Geometry Critic → LLM Tool Router → deterministic repair tool
+→ verify_scene`，把诊断 JSON 列表和 PDF 定义的 8 个工具 schema 一起交给
+LLM；模型只能选择工具、对象和策略，位移/姿态由 Tool 计算。旧的
+`/geometry/repair` MOVE 接口仍保留用于兼容；工具执行失败后会重新进入
+Geometry Critic，整个 ReAct 循环最多 10 轮。`/tasks` 的旧版 Fake durable
+worker 仍保留独立的 LangGraph checkpoint 实现。
+
+Geometry Repair 的运行记录和事件使用进程内存存储，不依赖 PostgreSQL；进程重启或
+多 worker 部署会丢失这些记录。`/tasks` 的旧版业务链路仍使用 PostgreSQL。
+
 ## 真实数据库测试
 
 ```sh

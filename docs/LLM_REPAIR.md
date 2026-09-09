@@ -35,8 +35,16 @@ docker compose up -d --build
 - Swagger：`http://127.0.0.1:8000/docs`
 - 配置状态：`GET http://127.0.0.1:8000/geometry/config`
 - 发起实战：`POST http://127.0.0.1:8000/geometry/repair`
+- 工具路由闭环：`POST http://127.0.0.1:8000/geometry/repair-graph`
 - 查看结果：`GET /geometry/repairs/{run_id}`
 - 查看追加式事件：`GET /geometry/repairs/{run_id}/events?after=0&limit=100`
+
+`/geometry/repair-graph` 按《RoomScout Geometry Critic & Repair Tools》执行
+显式 ReAct 闭环：Geometry Critic 后把结构化 `diagnostics` JSON 列表和 8 个
+确定性工具的 OpenAI `tools` schema 一起交给 LLM。LLM 只返回工具名、诊断 ID
+和策略；循环再执行确定性 Tool、强制 `verify_scene`，必要时
+`rollback_repair`。每次验证失败会重新进入 Geometry Critic，ReAct 循环最多
+10 轮。旧的 `/geometry/repair` MOVE 接口继续保留给兼容客户端。
 
 全部接口需 `Authorization: Bearer roomscout-local-demo`（若修改过 DEMO_TOKEN，则用自己的值）。配置端点返回是否已配置，不返回 Key，也不声称已探测供应商连通性。
 
@@ -64,23 +72,36 @@ curl http://127.0.0.1:8000/geometry/repair \
 
 请求是 `{"scene": <JSON场景或对象数组>, "max_iterations": 5}`，同时支持上一模块的简写 position_m/size_m 和完整 geometry 格式。上限 100 对象、20 轮。一次请求同步完成；每轮最多一次模型请求，候选由程序分别验证，不逐候选调用模型。请求可能持续数分钟，HTTP 代理和客户端须配置足够超时。响应 status 为 pass/blocked/iteration_limit，不能只看 HTTP 200 判定修复成功。
 
-## 持久化与错误
+## 运行记录与错误
 
-新增 Alembic 0002：geometry_runs 存运行投影，geometry_run_events 存 append-only 日志。USER_REQUEST 提交后才处理，LLM_REQUEST 提交后才发网络请求，LLM_RESPONSE 提交后才解析。报告、候选复查、接受编辑前的 ACTION_INTENT、最终结果都持久化。记录原始响应、usage（供应商提供时）、模型 ID、配置及延迟，不记录 Authorization 头或 API Key。几何场景和诊断会发送给所配置的模型供应商。
+Geometry Repair 使用线程安全的进程内 `InMemoryGeometryStore` 保存运行投影和
+append-only 事件，不依赖 PostgreSQL、Alembic 或 checkpoint。`USER_REQUEST` 记录后才
+开始处理，`LLM_REQUEST` 记录后才发网络请求，`LLM_RESPONSE` 记录后才解析。报告、
+接受编辑前的 `ACTION_INTENT`、最终结果和原始模型响应都会留在当前进程内；不记录
+Authorization 头或 API Key。几何场景和诊断会发送给所配置的模型供应商。
 
-GET events 通过 next_cursor 分页，可保存 items 为 JSONL 交给 geometry replay_journal；完成结果的确定性几何/动作可回放，不重新调用模型。模型本身的生成不保证可复现。
+GET events 通过 next_cursor 分页，可保存 items 为 JSONL 交给 geometry replay_journal；
+完成结果的确定性几何/动作可回放，不重新调用模型。模型本身的生成不保证可复现。
 
-同一用户、同一 Idempotency-Key、同一请求只创建一次运行；再次 POST 返回现有状态，不再次调用模型。改请求须改 key，原键异参 409。上游失败返回 502 和 run_id（例如 llm_http_401、llm_http_429、llm_timeout、llm_invalid_response）；无自动重试或静默回退，失败也保留事件。进程崩溃时可能保留 running；GET 事件定位最后进展，旧 key 不重试，需人工决定是否用新 key 重开以避免重复计费。
+同一进程、同一用户、同一 Idempotency-Key、同一请求只创建一次运行；再次 POST 返回
+现有状态，不再次调用模型。改请求须改 key，原键异参 409。上游失败返回 502 和 run_id
+（例如 llm_http_401、llm_http_429、llm_timeout、llm_invalid_response）；无自动重试或
+静默回退，失败也保留事件。进程重启、多个 API worker 或容器替换会丢失进程内运行记录，
+因此该存储适合本地同步实验，不提供跨进程耐久性。
 
-本模块独立于 /tasks 的 Fake Graph，不改变 Memory/Planning/LangGraph 协议；几何实战日志不自动进入 Mem0。当前 key 仅适合本地 demo 鉴权，不是多租户身份系统。
+本模块独立于 /tasks 的 Fake Graph，不改变 Memory/Planning 协议；几何修复路径使用显式
+ReAct 循环，/tasks 的旧版耐久任务仍使用其既有 LangGraph checkpoint。几何实战日志不自动
+进入 Mem0。当前 key 仅适合本地 demo 鉴权，不是多租户身份系统。
 
 ## 验证范围
 
-HTTP MockTransport 测试验证请求格式、鉴权头、真实解析和修复调用链；PostgreSQL 测试验证事件提交顺序、幂等、禁止修改事件、错误落库。测试服务返回预构造响应，因此不能证明你选用模型的修复能力；配置真实地址和模型后，用上述实战请求验证。
+HTTP MockTransport 测试验证请求格式、鉴权头、真实解析和修复调用链；内存存储测试验证
+事件顺序、幂等、分页和错误记录。测试服务返回预构造响应，因此不能证明你选用模型的
+修复能力；配置真实地址和模型后，用上述实战请求验证。
 
 ## 本轮验收
 
-- 本地 Python 3.14、Docker Python 3.12 + PostgreSQL 全套均 124 passed；一个原有 Starlette/AnyIO 弃用警告。
+- 本地 Python 3.14 全量测试 `98 passed, 30 skipped`；其中 Geometry Repair API 使用进程内存储，另有一个原有 Starlette/AnyIO 弃用警告。
 - 已使用用户填入的 DeepSeek 服务（配置模型 deepseek-v4-flash-vision-exp）进行一次真实请求，非测试替身。
 - Run ID：c361429c-e9d5-427f-be4c-045f98d5bdb1。一个盒体悬空 0.2 米，模型提出 delta=[0,0,-0.2]，确定性复查 PASS；中心 z=0.7→0.5 米。
 - 模型调用 1 次；供应商 usage：prompt_tokens=695、completion_tokens=303、total_tokens=998（completion 含 reasoning_tokens=260）。此结果是单个连通性/闭环样例，不是模型修复准确率评估。

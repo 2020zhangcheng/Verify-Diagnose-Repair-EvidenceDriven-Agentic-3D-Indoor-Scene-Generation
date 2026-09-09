@@ -67,9 +67,29 @@ class MovePrescription(Contract):
     diagnosis_id: ID
 
 
+RuleId = Literal[
+    'collision',
+    'penetration',
+    'floor_penetration',
+    'support',
+    'support_chain',
+    'floating',
+    'support_gap',
+    'support_instability',
+    'out_of_room',
+    'wall_penetration',
+    'door_clearance',
+    'path_blocked',
+    'spacing_too_small',
+    'orientation',
+    'upright',
+    'normal_mismatch',
+]
+
+
 class Diagnostic(Contract):
     diagnosis_id: ID
-    rule_id: Literal['collision','floor_penetration','support','support_chain']
+    rule_id: RuleId
     status: Literal['pass','fail','unknown']
     object_ids: tuple[ID,...]
     reason: str
@@ -77,6 +97,11 @@ class Diagnostic(Contract):
     severity: float = Field(ge=0,le=1)
     editable_variables: tuple[str,...] = ()
     suggestions: tuple[MovePrescription,...] = ()
+    # Geometry Critic fields used by the LLM Repair Router.  The legacy
+    # editable_variables/suggestions fields remain for the V1 MOVE adapter.
+    editable_objects: tuple[ID,...] = ()
+    locked_objects: tuple[ID,...] = ()
+    allowed_repair_tools: tuple[ID,...] = ()
 
 
 class DiagnosisReport(Contract):

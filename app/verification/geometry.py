@@ -8,6 +8,7 @@ from itertools import combinations
 from math import sqrt, prod
 from pathlib import Path
 from app.environment.geometry import axes, cross, dot, sub, corners, rotate
+from app.repair.catalog import allowed_repair_tools_for
 from app.verification.models import (SceneSnapshot, VerifierConfig, Diagnostic, DiagnosisReport,
                                       MovePrescription, fingerprint)
 
@@ -143,8 +144,17 @@ class DeterministicGeometryVerifier:
             ident = rule+':'+','.join(ids)
             editable = tuple(f'{i}.position' for i in ids if i in objects and objects[i].movable)
             moves = tuple(MovePrescription(object_id=i,delta_m=delta,diagnosis_id=ident) for i,delta in suggestions if objects[i].movable)
+            editable_objects = tuple(i for i in ids if i in objects and objects[i].movable)
+            locked_objects = tuple(i for i in ids if i in objects and not objects[i].movable)
+            allowed_tools = allowed_repair_tools_for(
+                rule,
+                status,
+                measurements,
+                contact_tolerance_m=config.contact_tolerance_m,
+            )
             result = Diagnostic(diagnosis_id=ident,rule_id=rule,status=status,object_ids=ids,reason=reason,
-                measurements=measurements,severity=min(1,max(0,amount)/config.severity_scale_m),editable_variables=editable,suggestions=moves)
+                measurements=measurements,severity=min(1,max(0,amount)/config.severity_scale_m),editable_variables=editable,suggestions=moves,
+                editable_objects=editable_objects,locked_objects=locked_objects,allowed_repair_tools=allowed_tools)
             diagnostics.append(result)
             return result
 

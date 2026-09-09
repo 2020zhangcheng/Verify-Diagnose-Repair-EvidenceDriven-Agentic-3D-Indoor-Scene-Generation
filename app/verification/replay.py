@@ -7,6 +7,13 @@ from app.verification.repair import apply_move
 
 
 def replay_journal(path):
+    # The tool-routing graph uses RepairAction/TOOL_SELECTED records instead
+    # of the legacy MOVE proposal contract.  Keep the original replay format
+    # stable while dispatching the new journal to its deterministic replayer.
+    rows = [json.loads(line) for line in Path(path).read_text().splitlines()]
+    if any(row.get('type') == 'TOOL_SELECTED' for row in rows):
+        from app.repair.replay import replay_graph_journal
+        return replay_graph_journal(path)
     verifier=scene=report=proposal=intent=None
     actions=[]
     final=None

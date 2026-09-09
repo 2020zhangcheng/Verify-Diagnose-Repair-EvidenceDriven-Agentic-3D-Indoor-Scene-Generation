@@ -3,18 +3,12 @@ from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import select, text
 from app.config import settings
+from app.api.auth import identity
 from app.db.postgres import SessionLocal
 from app.db.models.tables import Task, Project, EventRow, APIReceipt, EntityRecord
 from app.db.repositories.store import uid, digest, append_event, lifecycle, locked_task
 
 router = APIRouter()
-
-
-def identity(authorization: Annotated[str | None, Header()] = None):
-    import secrets
-    if not authorization or not secrets.compare_digest(authorization, f"Bearer {settings.demo_token}"):
-        raise HTTPException(401, "unauthorized")
-    return "demo-user"
 
 
 def get_task(session, ident, user):

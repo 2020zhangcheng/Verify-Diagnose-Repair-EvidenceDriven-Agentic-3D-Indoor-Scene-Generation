@@ -1,7 +1,7 @@
 import json
 import httpx
 import pytest
-from app.verification.llm import LLMSettings,LLMRepairPolicy,LLMRepairError
+from app.verification.llm import LLMSettings,LLMRepairPolicy,LLMRepairError,build_system_prompt
 from app.verification.geometry import DeterministicGeometryVerifier
 from app.verification.io import load_snapshot
 from app.verification.repair import repair_scene
@@ -17,6 +17,13 @@ def scene():
 
 def reply(content,finish='stop'):
     return httpx.Response(200,json={'choices':[{'finish_reason':finish,'message':{'content':content}}],'usage':{'prompt_tokens':10,'completion_tokens':20,'total_tokens':30}})
+
+
+def test_system_prompt_builder_injects_request_limits():
+    prompt=build_system_prompt(maximum_move_m=1.25,maximum_candidates=3)
+    assert 'no longer than 1.25 meters' in prompt
+    assert 'at most 3 move alternatives' in prompt
+    assert 'Return only JSON: {"moves":[{"object_id":"id"' in prompt
 
 
 def test_real_http_contract_and_guarded_loop():

@@ -1,4 +1,9 @@
-"""PostgreSQL Event First journal; each emit commits before returning."""
+"""Legacy PostgreSQL Event First journal.
+
+The standalone Geometry API now uses ``memory_persistence``.  This module is
+kept for the historical database migration and PostgreSQL integration
+fixtures; it is not imported by the Geometry Repair endpoints.
+"""
 from datetime import datetime
 from sqlalchemy import Text,BigInteger,ForeignKey,select,UniqueConstraint,DateTime,text
 from sqlalchemy.dialects.postgresql import JSONB
