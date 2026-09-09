@@ -1,6 +1,7 @@
 # RoomScout Geometry Repair
 
-RoomScout 是一个只保留 Geometry Critic 修复闭环的 FastAPI 服务：
+RoomScout 的 HTTP 入口是 Geometry Critic 修复闭环，同时保留独立的场景信念、
+模拟环境和感知数学模型：
 
 `Geometry Critic → LLM 选择 tool → 确定性 tool 执行 → 验证`
 
@@ -76,13 +77,30 @@ curl -H 'Authorization: Bearer roomscout-local-demo' \
 当前盒体 V1 数据只实现了碰撞、支撑和地面边界的确定性修复；未实现的能力会
 被安全拒绝，不会让模型自行编造坐标。
 
+## 数学建模模块
+
+以下模块是纯 Python、无外部服务依赖的确定性模型：
+
+- `app/contracts/models.py`：场景、观测、信念、约束和验证合同。
+- `app/environment/geometry.py`：四元数坐标轴、OBB/SAT、射线盒体相交和房间边界。
+- `app/environment/minimal.py`：相机移动、RGB/深度生成、遮挡、碰撞和会话幂等。
+- `app/perception/simulation.py`：基于模拟真值的结构化观测生成。
+- `app/scene/geometry.py`、`app/scene/belief.py`：跨视角盒体融合、冲突检测、证据
+  链和不确定性评分。
+
+这些模块作为库和离线 Demo 使用；HTTP 服务仍专注于 Geometry Critic 修复。
+数学公式和模型边界见 [MATHEMATICAL_MODELS.md](docs/MATHEMATICAL_MODELS.md)。
+
 ## 测试与演示
 
 ```sh
 .venv/bin/pytest -q
-python scripts/demo_llm_repair.py \
+python3 -m scripts.demo_llm_repair \
   --input configs/geometry-react-bad-demo.json \
   --api http://127.0.0.1:8000
+
+python3 -m scripts.demo_simulation_belief
+python3 -m scripts.demo_scene_belief
 ```
 
 默认运行产物放在 `output/`，已加入 `.gitignore`。可复现的坏场景和 Critic 配置
