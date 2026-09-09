@@ -15,13 +15,13 @@ from app.repair.tools import (
     StabilizeSupportTool,
     ToolConfig,
     ToolOutcome,
-    UnsupportedV0Tool,
+    UnsupportedTool,
 )
 from app.verification.models import DiagnosisReport, SceneSnapshot
 
 
 class RepairToolRegistry:
-    """The only entry point through which the graph can execute a repair."""
+    """The only entry point through which the ReAct loop can execute a repair."""
 
     repair_names = REPAIR_TOOL_NAMES[:6]
     control_names = REPAIR_TOOL_NAMES[6:]
@@ -56,7 +56,7 @@ class RepairToolRegistry:
 
     def validate_selection(self, report: DiagnosisReport, selection: RepairToolSelection):
         if selection.tool not in self.repair_names:
-            raise DeterministicToolError("graph_controls_tool_lifecycle")
+            raise DeterministicToolError("loop_controls_tool_lifecycle")
         diagnostic = next(
             (item for item in report.diagnostics if item.diagnosis_id == selection.selected_diagnosis_id),
             None,
@@ -81,7 +81,7 @@ class RepairToolRegistry:
     def execute(self, scene: SceneSnapshot, report: DiagnosisReport, selection: RepairToolSelection) -> ToolOutcome:
         diagnostic = self.validate_selection(report, selection)
         args = dict(selection.arguments)
-        # The revision is graph-owned, not model-owned.  This prevents a model
+        # The revision is loop-owned, not model-owned. This prevents a model
         # from fabricating a revision while keeping the public request contract.
         args.pop("scene_revision", None)
         args["diagnosis_id"] = selection.selected_diagnosis_id
@@ -106,7 +106,7 @@ def default_repair_tool_registry(config=None) -> RepairToolRegistry:
             RepairSupportContactTool(tool_config),
             StabilizeSupportTool(tool_config),
             RepairBoundaryTool(tool_config),
-            UnsupportedV0Tool("repair_clearance", {"door_clearance", "path_blocked", "spacing_too_small"}),
-            UnsupportedV0Tool("repair_orientation", {"orientation", "upright", "normal_mismatch"}),
+            UnsupportedTool("repair_clearance", {"door_clearance", "path_blocked", "spacing_too_small"}),
+            UnsupportedTool("repair_orientation", {"orientation", "upright", "normal_mismatch"}),
         )
     )

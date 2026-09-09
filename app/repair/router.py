@@ -8,7 +8,6 @@ from typing import Any
 
 import httpx
 
-from app.repair.catalog import repair_tool_schemas
 from app.repair.models import RepairToolSelection
 from app.repair.registry import RepairToolRegistry, default_repair_tool_registry
 from app.verification.llm import LLMRepairError, LLMSettings
@@ -30,11 +29,11 @@ Rules:
 4. Never modify an object with movable=false or a locked object.
 5. Prefer the minimum scene change that resolves the diagnosis.
 6. Handle one diagnosis at a time unless diagnoses are independent.
-7. After every repair, the graph calls verify_scene.
-8. If the repair creates new or more severe violations, the graph calls rollback_repair.
+7. After every repair, the ReAct loop calls verify_scene.
+8. If the repair creates new or more severe violations, the ReAct loop calls rollback_repair.
 9. Do not use delete, scale, free-form translate, or free-form place as shortcuts.
 10. Finish only when Geometry Critic returns PASS.
-11. Do not select verify_scene or rollback_repair directly; the graph controls these lifecycle tools.
+11. Do not select verify_scene or rollback_repair directly; the ReAct loop controls these lifecycle tools.
 
 Use a native function tool call when available. If the provider cannot emit one,
 return only JSON with selected_diagnosis_id, tool, arguments, and reason_code.
@@ -72,13 +71,7 @@ class GeometryRepairRouter:
             (diagnostic for diagnostic in report.diagnostics if diagnostic.status == "fail"),
             key=lambda diagnostic: (-diagnostic.severity, diagnostic.diagnosis_id),
         ):
-            # The legacy verifier still stores MOVE suggestions for its
-            # compatibility policy.  Do not expose those numeric deltas to the
-            # new planner: the PDF contract gives the LLM measurements and
-            # editable/locked IDs, while the Tool computes the transform.
             diagnostic = item.model_dump(mode="json")
-            diagnostic.pop("suggestions", None)
-            diagnostic.pop("editable_variables", None)
             diagnostics.append(diagnostic)
         schemas = self.registry.schemas
         return {
@@ -230,6 +223,5 @@ class GeometryRepairRouter:
             if own:
                 client.close()
 
-    # A small semantic alias for callers that describe the node as a chooser;
-    # the graph itself uses ``route`` to make the planner boundary explicit.
+    # A small semantic alias for callers that describe the planner as a chooser.
     choose = route

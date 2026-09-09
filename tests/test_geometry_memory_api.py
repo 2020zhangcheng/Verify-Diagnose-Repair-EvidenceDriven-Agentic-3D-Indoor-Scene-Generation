@@ -8,7 +8,7 @@ from app.api import geometry
 from app.config import settings as app_settings
 from app.main import app
 from app.repair.router import GeometryRepairRouter
-from app.verification.replay import replay_journal
+from app.repair.replay import replay_journal
 
 
 AUTH = {"Authorization": f"Bearer {app_settings.demo_token}"}
@@ -27,7 +27,7 @@ def configure(monkeypatch):
     monkeypatch.setenv("ROOMSCOUT_LLM_API_KEY", "memory-test-secret")
 
 
-def test_geometry_repair_graph_uses_memory_store(monkeypatch, tmp_path):
+def test_geometry_repair_uses_memory_store(monkeypatch, tmp_path):
     configure(monkeypatch)
     geometry.geometry_store.clear()
     calls = []
@@ -74,7 +74,7 @@ def test_geometry_repair_graph_uses_memory_store(monkeypatch, tmp_path):
         )
         with TestClient(app) as client:
             headers = {**AUTH, "Idempotency-Key": "memory-react-001"}
-            response = client.post("/geometry/repair-graph", headers=headers, json=body())
+            response = client.post("/geometry/repair", headers=headers, json=body())
             assert response.status_code == 200, response.text
             result = response.json()
             assert result["status"] == "pass"
@@ -83,10 +83,10 @@ def test_geometry_repair_graph_uses_memory_store(monkeypatch, tmp_path):
             assert len(calls) == 3
 
             # The second request is served from process-local idempotency state.
-            assert client.post("/geometry/repair-graph", headers=headers, json=body()).json() == result
+            assert client.post("/geometry/repair", headers=headers, json=body()).json() == result
             changed = body()
             changed["max_iterations"] = 1
-            assert client.post("/geometry/repair-graph", headers=headers, json=changed).status_code == 409
+            assert client.post("/geometry/repair", headers=headers, json=changed).status_code == 409
 
             events = []
             after = 0

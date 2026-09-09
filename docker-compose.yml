@@ -1,58 +1,18 @@
-x-app: &app
-  build: .
-  environment:
-    DATABASE_URL: postgresql+psycopg://roomscout_app:roomscout_local_app@db:5432/roomscout
-    CHECKPOINT_URL: postgresql://roomscout_app:roomscout_local_app@db:5432/roomscout?options=-csearch_path%3Dcheckpoints
-    DEMO_TOKEN: ${DEMO_TOKEN:-roomscout-local-demo}
-    ROOMSCOUT_LLM_BASE_URL: ${ROOMSCOUT_LLM_BASE_URL:-}
-    ROOMSCOUT_LLM_API_KEY: ${ROOMSCOUT_LLM_API_KEY:-}
-    ROOMSCOUT_LLM_MODEL: ${ROOMSCOUT_LLM_MODEL:-}
-    ROOMSCOUT_LLM_TIMEOUT_SECONDS: ${ROOMSCOUT_LLM_TIMEOUT_SECONDS:-60}
-    ROOMSCOUT_LLM_MAX_TOKENS: ${ROOMSCOUT_LLM_MAX_TOKENS:-1500}
-    ROOMSCOUT_LLM_TOKEN_PARAMETER: ${ROOMSCOUT_LLM_TOKEN_PARAMETER:-max_tokens}
-    ROOMSCOUT_LLM_JSON_MODE: ${ROOMSCOUT_LLM_JSON_MODE:-true}
-    ROOMSCOUT_LLM_MAX_CANDIDATES: ${ROOMSCOUT_LLM_MAX_CANDIDATES:-8}
-  depends_on:
-    migrate:
-      condition: service_completed_successfully
 services:
-  db:
-    image: pgvector/pgvector:pg16
-    environment:
-      POSTGRES_USER: roomscout
-      POSTGRES_PASSWORD: roomscout
-      POSTGRES_DB: roomscout
-    ports: ["127.0.0.1:55432:5432"]
-    volumes: ["postgres_data:/var/lib/postgresql/data"]
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U roomscout -d roomscout"]
-      interval: 2s
-      timeout: 3s
-      retries: 30
-  migrate:
+  api:
     build: .
     environment:
-      DATABASE_URL: postgresql+psycopg://roomscout:roomscout@db:5432/roomscout
-      CHECKPOINT_URL: postgresql://roomscout:roomscout@db:5432/roomscout?options=-csearch_path%3Dcheckpoints
-    command: ["sh", "-c", "alembic upgrade head && python -m app.db.bootstrap"]
-    depends_on:
-      db:
-        condition: service_healthy
-  api:
-    <<: *app
-    ports: ["127.0.0.1:8000:8000"]
+      DEMO_TOKEN: ${DEMO_TOKEN:-roomscout-local-demo}
+      ROOMSCOUT_LLM_BASE_URL: ${ROOMSCOUT_LLM_BASE_URL:-}
+      ROOMSCOUT_LLM_API_KEY: ${ROOMSCOUT_LLM_API_KEY:-}
+      ROOMSCOUT_LLM_MODEL: ${ROOMSCOUT_LLM_MODEL:-}
+      ROOMSCOUT_LLM_TIMEOUT_SECONDS: ${ROOMSCOUT_LLM_TIMEOUT_SECONDS:-60}
+      ROOMSCOUT_LLM_MAX_TOKENS: ${ROOMSCOUT_LLM_MAX_TOKENS:-1500}
+      ROOMSCOUT_LLM_TOKEN_PARAMETER: ${ROOMSCOUT_LLM_TOKEN_PARAMETER:-max_tokens}
+    ports:
+      - "127.0.0.1:8000:8000"
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
       interval: 5s
       timeout: 3s
       retries: 20
-  worker:
-    <<: *app
-    command: ["python", "-m", "app.workers.agent_runner"]
-    restart: unless-stopped
-  memory-worker:
-    <<: *app
-    command: ["python", "-m", "app.workers.memory_worker"]
-    restart: unless-stopped
-volumes:
-  postgres_data:

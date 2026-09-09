@@ -1,4 +1,4 @@
-"""Contracts shared by deterministic repair tools and the LangGraph state."""
+"""Contracts shared by the ReAct loop and deterministic repair tools."""
 
 from __future__ import annotations
 
@@ -6,12 +6,12 @@ from typing import Any, Literal, Protocol
 
 from pydantic import Field
 
-from app.contracts.models import Contract, ID, Vec3, CameraPose
+from app.contracts.models import CameraPose, Contract, ID, Vec3
 from app.verification.models import DiagnosisReport, SceneSnapshot
 
 
 class RepairRequest(Contract):
-    """Validated request passed from the router to a deterministic tool."""
+    """Validated semantic request passed from the router to a tool."""
 
     diagnosis_id: ID
     scene_revision: ID
@@ -53,17 +53,15 @@ class RepairToolOutcome(Contract):
 
 
 class RepairTool(Protocol):
-    """Replaceable tool interface from the design document."""
-
     name: str
 
     def can_handle(self, diagnosis) -> bool: ...
 
-    def solve(self, scene: SceneSnapshot, diagnosis, request: RepairRequest): ...
+    def solve(self, scene: SceneSnapshot, diagnosis, request: RepairRequest) -> RepairToolOutcome: ...
 
 
-class RepairGraphResult(Contract):
-    """Serializable result of the Geometry Critic -> Router -> Tool loop."""
+class RepairResult(Contract):
+    """Serializable result of one bounded Geometry Critic/ReAct run."""
 
     status: Literal["pass", "blocked", "iteration_limit", "error"]
     initial_revision: ID

@@ -59,7 +59,7 @@ def repair_tool_schemas(*, include_control_tools: bool = True) -> list[dict[str,
     The list is rebuilt for every request so callers can safely serialize it
     into both the HTTP ``tools`` field and the JSON context shown to the LLM.
     ``verify_scene`` and ``rollback_repair`` are included because they are part
-    of the documented tool contract, although the graph controls when those
+    of the documented tool contract, although the ReAct loop controls when those
     lifecycle operations are legal.
     """
 
@@ -160,7 +160,7 @@ def repair_tool_schemas(*, include_control_tools: bool = True) -> list[dict[str,
                     {
                         "scene_revision": {
                             "type": "string",
-                            "description": "Current scene revision; supplied by the graph.",
+                            "description": "Current scene revision; supplied by the ReAct loop.",
                         }
                     },
                     ["scene_revision"],
@@ -171,7 +171,7 @@ def repair_tool_schemas(*, include_control_tools: bool = True) -> list[dict[str,
                     {
                         "repair_action_id": {
                             "type": "string",
-                            "description": "Repair action ID from the graph history.",
+                            "description": "Repair action ID from the ReAct history.",
                         }
                     },
                     ["repair_action_id"],

@@ -1,10 +1,4 @@
-"""In-process run storage for the standalone Geometry Repair API.
-
-Geometry Repair is a synchronous experiment.  It only needs a small
-thread-safe run registry and an append-only event list while the process is
-alive; the durable PostgreSQL event store belongs to the unrelated /tasks
-workflow.
-"""
+"""Thread-safe, process-local run and event storage for Geometry Repair."""
 
 from __future__ import annotations
 
@@ -17,7 +11,7 @@ from uuid import uuid4
 
 
 def digest(value: Any) -> str:
-    """Return a stable request hash without importing the database layer."""
+    """Return a stable request hash for idempotency checks."""
 
     return sha256(json.dumps(value, sort_keys=True, ensure_ascii=False).encode()).hexdigest()
 

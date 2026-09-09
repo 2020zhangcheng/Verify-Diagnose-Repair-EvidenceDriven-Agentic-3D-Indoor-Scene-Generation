@@ -3,7 +3,7 @@ import json
 import httpx
 
 from app.repair.catalog import REPAIR_TOOL_NAMES, repair_tool_schemas
-from app.repair.graph import run_repair_graph
+from app.repair.loop import run_repair_loop
 from app.repair.router import GeometryRepairRouter
 from app.verification.geometry import DeterministicGeometryVerifier
 from app.verification.io import load_snapshot
@@ -77,7 +77,7 @@ def test_explicit_react_routes_tools_and_reverifies_every_action():
     settings = LLMSettings(_env_file=None, base_url="https://model.example/v1", model="test-model")
     with httpx.Client(transport=httpx.MockTransport(handler)) as client:
         router = GeometryRepairRouter(settings, client=client)
-        result = run_repair_graph(
+        result = run_repair_loop(
             load_snapshot("configs/geometry-diagnosis-demo.json"),
             DeterministicGeometryVerifier(),
             router,

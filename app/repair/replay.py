@@ -1,17 +1,17 @@
-"""Deterministic replay for the LangGraph tool-routing journal."""
+"""Deterministic replay for an explicit ReAct repair journal."""
 
 from __future__ import annotations
 
 import json
 from pathlib import Path
 
-from app.repair.models import RepairGraphResult, RepairToolSelection
+from app.repair.models import RepairResult, RepairToolSelection
 from app.repair.registry import default_repair_tool_registry
 from app.verification.geometry import DeterministicGeometryVerifier
-from app.verification.models import SceneSnapshot, VerifierConfig, DiagnosisReport
+from app.verification.models import SceneSnapshot, VerifierConfig
 
 
-def replay_graph_journal(path):
+def replay_journal(path):
     rows = [json.loads(line) for line in Path(path).read_text().splitlines()]
     verifier = None
     registry = None
@@ -90,14 +90,17 @@ def replay_graph_journal(path):
             actions = [action for action in actions if action.repair_action_id != payload["repair_action_id"]]
             before = None
         elif kind == "FINAL_RESULT":
-            final = RepairGraphResult.model_validate(payload)
+            final = RepairResult.model_validate(payload)
             if scene is None or report is None:
                 raise ValueError("final result before scene")
             if final.scene != scene or final.report != report or final.actions != tuple(actions):
-                raise ValueError("final graph replay mismatch")
+                raise ValueError("final repair replay mismatch")
         # LLM_REQUEST/LLM_RESPONSE/LLM_PARSED/TOOL_RESULT and USER_REQUEST are
         # audit records; replay never trusts them as geometry facts.
 
     if final is None:
         raise ValueError("journal has no completed repair result")
     return final
+
+
+__all__ = ["replay_journal"]

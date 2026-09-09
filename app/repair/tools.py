@@ -1,4 +1,4 @@
-"""Deterministic V0 repair tools.
+"""Deterministic Geometry Repair tools.
 
 Every tool receives a diagnosis and a small semantic request.  It computes the
 transform from the scene geometry and returns a new immutable SceneSnapshot plus
@@ -323,8 +323,8 @@ class RepairBoundaryTool(DeterministicRepairTool):
         )
 
 
-class UnsupportedV0Tool(DeterministicRepairTool):
-    """Catalogued tools whose solver data is not present in the box V0 scene."""
+class UnsupportedTool(DeterministicRepairTool):
+    """Catalogued tools whose solver data is outside the current box model."""
 
     def __init__(self, name: str, rule_ids: set[str]):
         self.name = name
@@ -334,4 +334,4 @@ class UnsupportedV0Tool(DeterministicRepairTool):
         return diagnosis.rule_id in self.rule_ids and super().can_handle(diagnosis)
 
     def solve(self, scene, diagnosis, request):
-        raise DeterministicToolError(f"{self.name}_requires_v1_solver_data")
+        raise DeterministicToolError(f"{self.name}_solver_not_available")

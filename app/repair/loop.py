@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from typing import Any, Callable, NotRequired, TypedDict
 
-from app.repair.models import RepairAction, RepairGraphResult, RepairToolSelection
+from app.repair.models import RepairAction, RepairResult, RepairToolSelection
 from app.repair.registry import RepairToolRegistry, default_repair_tool_registry
 from app.repair.router import GeometryRepairRouter
 from app.verification.geometry import DeterministicGeometryVerifier
@@ -44,11 +44,6 @@ class RepairLoopState(TypedDict):
     error: str | None
     initial_revision: str
     last_tool_error: NotRequired[str | None]
-
-
-# Keep the old type name available to integrations that imported it while the
-# implementation moves from a graph object to an explicit loop.
-RepairGraphState = RepairLoopState
 
 
 def _objective(report: DiagnosisReport) -> tuple[int, int, float]:
@@ -356,7 +351,7 @@ def _mark_iteration_limit(state: RepairLoopState, emit: Callable[[str, dict[str,
     state["events"] = _record(state, "TASK_BLOCKED", payload, emit)
 
 
-def run_repair_graph(
+def run_repair_loop(
     scene: SceneSnapshot,
     verifier: DeterministicGeometryVerifier | None = None,
     router: GeometryRepairRouter | None = None,
@@ -364,12 +359,11 @@ def run_repair_graph(
     registry: RepairToolRegistry | None = None,
     max_iterations: int | None = None,
     emit: Callable[[str, dict[str, Any]], None] | None = None,
-) -> RepairGraphResult:
+) -> RepairResult:
     """Run the explicit Geometry Critic → ReAct Tool loop.
 
-    The function name remains stable for existing API callers; no graph
-    library is involved. ``max_iterations`` is always capped at ten, and one
-    iteration means one deterministic tool execution followed by verification.
+    ``max_iterations`` is always capped at ten, and one iteration means one
+    deterministic tool execution followed by verification.
     """
 
     verifier = verifier or DeterministicGeometryVerifier()
@@ -379,7 +373,7 @@ def run_repair_graph(
         raise ValueError("max_iterations must be positive")
 
     event_sink = emit or (lambda kind, payload: None)
-    graph_registry = registry or (router.registry if router is not None else default_repair_tool_registry(verifier.config))
+    tool_registry = registry or (router.registry if router is not None else default_repair_tool_registry(verifier.config))
     router_holder = {"value": router}
     state = _initial_state(scene, iterations)
     if emit is not None:
@@ -396,7 +390,7 @@ def run_repair_graph(
             _mark_blocked(state, event_sink)
             break
 
-        route_transition = _route_tool(state, router_holder, graph_registry, event_sink)
+        route_transition = _route_tool(state, router_holder, tool_registry, event_sink)
         if route_transition == "iteration_limit":
             _mark_iteration_limit(state, event_sink)
             break
@@ -404,7 +398,7 @@ def run_repair_graph(
             _mark_blocked(state, event_sink)
             break
 
-        execute_transition = _execute_tool(state, graph_registry, event_sink)
+        execute_transition = _execute_tool(state, tool_registry, event_sink)
         if execute_transition == "blocked":
             _mark_blocked(state, event_sink)
             break
@@ -426,7 +420,7 @@ def run_repair_graph(
     report = state.get("report")
     if report is None:
         report = verifier.diagnose(state["scene"])
-    result = RepairGraphResult(
+    result = RepairResult(
         status=state.get("status", "blocked"),
         initial_revision=scene.revision,
         scene=state["scene"],
@@ -441,9 +435,4 @@ def run_repair_graph(
     return result
 
 
-# Descriptive alias for new callers; the old name remains for endpoint and
-# integration compatibility.
-run_repair_loop = run_repair_graph
-
-
-__all__ = ["REACT_MAX_ITERATIONS", "RepairLoopState", "RepairGraphState", "run_repair_graph", "run_repair_loop"]
+__all__ = ["REACT_MAX_ITERATIONS", "RepairLoopState", "run_repair_loop"]
