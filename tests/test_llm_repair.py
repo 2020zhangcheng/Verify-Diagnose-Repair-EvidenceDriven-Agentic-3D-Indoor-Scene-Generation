@@ -1,88 +1,120 @@
 import json
+
 import httpx
 import pytest
-from app.verification.llm import LLMSettings,LLMRepairPolicy,LLMRepairError
+
+from app.repair.router import GeometryRepairRouter
 from app.verification.geometry import DeterministicGeometryVerifier
 from app.verification.io import load_snapshot
-from app.verification.repair import repair_scene
+from app.verification.llm import LLMRepairError, LLMSettings
 
 
 def settings(**kwargs):
-    return LLMSettings(_env_file=None,base_url='https://model.example/v1',model='test-model',api_key='unit-test-secret',**kwargs)
+    return LLMSettings(
+        _env_file=None,
+        base_url="https://model.example/v1",
+        model="test-model",
+        api_key="unit-test-secret",
+        **kwargs,
+    )
 
 
 def scene():
-    return load_snapshot('configs/geometry-diagnosis-demo.json')
+    return load_snapshot("configs/geometry-diagnosis-demo.json")
 
 
-def reply(content,finish='stop'):
-    return httpx.Response(200,json={'choices':[{'finish_reason':finish,'message':{'content':content}}],'usage':{'prompt_tokens':10,'completion_tokens':20,'total_tokens':30}})
+def report():
+    value = scene()
+    return DeterministicGeometryVerifier().diagnose(value)
 
 
-def test_real_http_contract_and_guarded_loop():
-    log=[]
+def selection_response(diagnostic):
+    tool = diagnostic["allowed_repair_tools"][0]
+    target = diagnostic["editable_objects"][0]
+    arguments = {"diagnosis_id": diagnostic["diagnosis_id"]}
+    arguments["movable_object_id" if tool == "resolve_collision" else "object_id"] = target
+    return httpx.Response(
+        200,
+        json={
+            "choices": [
+                {
+                    "finish_reason": "tool_calls",
+                    "message": {
+                        "tool_calls": [
+                            {
+                                "type": "function",
+                                "function": {"name": tool, "arguments": json.dumps(arguments)},
+                            }
+                        ]
+                    },
+                }
+            ]
+        },
+    )
+
+
+def test_router_sends_diagnostics_and_same_tool_list_in_both_protocol_slots():
+    events = []
+
     def handler(request):
-        assert request.url=='https://model.example/v1/chat/completions'
-        assert request.headers['authorization']=='Bearer unit-test-secret'
-        assert log[-1][0]=='LLM_REQUEST'
-        body=json.loads(request.content)
-        assert body['response_format']=={'type':'json_object'}
-        context=json.loads(body['messages'][1]['content'])
-        moves=[m for d in context['diagnostics'] if d['status']=='fail' for m in d['suggestions']][:8]
-        return reply(json.dumps({'moves':moves}))
+        payload = json.loads(request.content)
+        context = json.loads(payload["messages"][1]["content"])
+        assert payload["tools"] == context["tools"]
+        diagnostic = next(item for item in context["diagnostics"] if item["allowed_repair_tools"])
+        return selection_response(diagnostic)
+
     with httpx.Client(transport=httpx.MockTransport(handler)) as client:
-        policy=LLMRepairPolicy(settings(),lambda k,p:log.append((k,p)),client)
-        result=repair_scene(scene(),DeterministicGeometryVerifier(),policy)
-    assert result.status=='pass' and len(result.actions)==3
-    assert policy.calls==3
-    assert 'unit-test-secret' not in json.dumps(log)
-    assert log[-1][1]['usage']['total_tokens']==30
+        router = GeometryRepairRouter(settings(), client=client, emit=lambda kind, payload: events.append((kind, payload)))
+        value = scene()
+        selection = router.route(value, report())
+
+    assert selection.tool == "resolve_collision"
+    assert router.calls == 1
+    assert all("unit-test-secret" not in json.dumps(payload) for _, payload in events)
 
 
-@pytest.mark.parametrize('content,finish',[
-    ('not json','stop'),('{"moves":[],"status":"pass"}','stop'),
-    ('{"moves":[{"object_id":"x","delta_m":[0,0,0],"diagnosis_id":"x","delete":true}]}','stop'),
-    ('{"moves":[]}','length'),
-])
-def test_invalid_or_truncated_response_fails(content,finish):
-    with httpx.Client(transport=httpx.MockTransport(lambda r:reply(content,finish))) as client:
-        policy=LLMRepairPolicy(settings(),client=client)
-        with pytest.raises(LLMRepairError):
-            policy.propose(scene(),DeterministicGeometryVerifier().diagnose(scene()))
-
-
-def test_http_error_no_silent_rule_fallback():
-    with httpx.Client(transport=httpx.MockTransport(lambda r:httpx.Response(401,json={'error':'bad key'}))) as client:
-        with pytest.raises(LLMRepairError,match='llm_http_401'):
-            repair_scene(scene(),DeterministicGeometryVerifier(),LLMRepairPolicy(settings(),client=client))
-
-
-def test_timeout():
+def test_router_accepts_structured_json_fallback():
     def handler(request):
-        raise httpx.ReadTimeout('timeout')
+        return httpx.Response(
+            200,
+            json={
+                "choices": [
+                    {
+                        "finish_reason": "stop",
+                        "message": {
+                            "content": json.dumps(
+                                {
+                                    "selected_diagnosis_id": "collision:chair_a,chair_b",
+                                    "tool": "resolve_collision",
+                                    "arguments": {"movable_object_id": "chair_a"},
+                                    "reason_code": "structured",
+                                }
+                            )
+                        },
+                    }
+                ]
+            },
+        )
+
     with httpx.Client(transport=httpx.MockTransport(handler)) as client:
-        with pytest.raises(LLMRepairError,match='llm_timeout'):
-            repair_scene(scene(),DeterministicGeometryVerifier(),LLMRepairPolicy(settings(),client=client))
+        chosen = GeometryRepairRouter(settings(), client=client).route(scene(), report())
+    assert chosen.tool == "resolve_collision"
+    assert chosen.arguments["diagnosis_id"] == "collision:chair_a,chair_b"
 
 
-def test_unconfigured_rejected():
-    with pytest.raises(LLMRepairError,match='not_configured'):
-        LLMRepairPolicy(LLMSettings(_env_file=None,base_url='',model=''))
+@pytest.mark.parametrize(
+    "response, expected",
+    [
+        (httpx.Response(401, json={"error": "bad key"}), "llm_http_401"),
+        (httpx.Response(200, json={"choices": []}), "llm_invalid_response"),
+    ],
+)
+def test_router_rejects_invalid_provider_responses(response, expected):
+    with httpx.Client(transport=httpx.MockTransport(lambda request: response)) as client:
+        with pytest.raises(LLMRepairError, match=expected):
+            GeometryRepairRouter(settings(), client=client).route(scene(), report())
 
 
-def test_model_cannot_move_fixed_objects_or_invent_diagnosis():
-    moves=[{'object_id':'pedestal','delta_m':[1,0,0],'diagnosis_id':'support:vase,pedestal'},
-           {'object_id':'vase','delta_m':[0,0,0],'diagnosis_id':'invented'}]
-    with httpx.Client(transport=httpx.MockTransport(lambda r:reply(json.dumps({'moves':moves})))) as client:
-        result=repair_scene(scene(),DeterministicGeometryVerifier(),LLMRepairPolicy(settings(),client=client))
-    assert result.status=='blocked' and not result.actions
-
-
-def test_journal_failure_prevents_network():
-    def emit(kind,payload):
-        raise OSError('db down')
-    def handler(request):
-        pytest.fail('must persist before HTTP')
-    with httpx.Client(transport=httpx.MockTransport(handler)) as client:
-        with pytest.raises(OSError):
-            LLMRepairPolicy(settings(),emit,client).propose(scene(),DeterministicGeometryVerifier().diagnose(scene()))
+def test_unconfigured_router_is_rejected():
+    with pytest.raises(LLMRepairError, match="not_configured"):
+        GeometryRepairRouter(LLMSettings(_env_file=None, base_url="", model=""))

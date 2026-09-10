@@ -1,60 +1,65 @@
-"""HTTP demo: real SceneBeliefService, explicitly Mock inputs and downstream nodes."""
+"""Run the restored SceneBelief fusion model with deterministic fake observations."""
+
+import argparse
 import asyncio
 import json
-import os
-import time
-from uuid import uuid4
-import httpx
+from pathlib import Path
+
+from app.contracts.models import OperationContext, TaskSpec
+from app.environment.fake import FakeEnvironmentAdapter
+from app.scene.belief import InMemoryObservationArchive, StructuredSceneBeliefService
+from app.scene.fixtures import structured_observation
 
 
-def main():
-    headers = {"Authorization": f"Bearer {os.getenv('DEMO_TOKEN', 'roomscout-local-demo')}", "Idempotency-Key": str(uuid4())}
-    with httpx.Client(base_url=os.getenv("ROOMSCOUT_API_URL", "http://localhost:8000"), headers=headers, timeout=10) as client:
-        response = client.post("/tasks", json={"request": "把书桌移动到窗户附近", "config_id": "scene-belief-v1"})
-        response.raise_for_status()
-        ident = response.json()["task_id"]
-        deadline = time.monotonic()+60
-        while time.monotonic() < deadline:
-            response = client.get(f"/tasks/{ident}")
-            response.raise_for_status()
-            status = response.json()
-            if status["status"] in ("finished", "failed", "blocked"):
-                break
-            time.sleep(.2)
-        else:
-            raise RuntimeError("demo timeout")
-        assert status["status"] == "finished", status
-        snapshots = []
-        for version in (1, 2):
-            response = client.get(f"/tasks/{ident}/belief", params={"version": version})
-            response.raise_for_status()
-            belief = response.json()["belief"]
-            snapshots.append({"version": version, "fusion_version": belief["fusion_version"],
-                "desk_position": belief["objects"][0]["geometry"]["pose"]["position_m"],
-                "desk_uncertainty": belief["objects"][0]["uncertainty"],
-                "regions": {r["region_id"]: r["kind"] for r in belief["regions"]},
-                "window_claim": next(c for c in belief["claims"] if c["claim_id"] == "window-space-empty"),
-                "evidence": belief["objects"][0]["evidence"]})
-        assert snapshots[0]["window_claim"]["status"] == "uncertain"
-        assert snapshots[1]["window_claim"]["status"] == "supported"
-        assert 0 < snapshots[1]["desk_position"][0] < .04
-        assert snapshots[1]["regions"]["behind-cabinet"] == "unobserved"
-        events, after = [], 0
-        while True:
-            page_response = client.get(f"/tasks/{ident}/events", params={"after": after})
-            page_response.raise_for_status()
-            page = page_response.json()
-            events.extend(page["items"])
-            if page["next_cursor"] is None:
-                break
-            after = page["next_cursor"]
-        from app.scene.replay import replay_beliefs
-        replayed = asyncio.run(replay_beliefs(events))
-        assert len(replayed) == 2
-        print(json.dumps({"task_id": ident, "event_replay_matches": True, "status": status["status"], "real_module": "SceneBeliefService",
-            "mock_modules": ["Observation source", "LayoutPlanner", "CriticalUnknownDetector", "ViewGenerator", "ViewSelector", "GeometryVerifier", "Action", "Memory"],
-            "snapshots": snapshots}, ensure_ascii=False, indent=2))
+async def run(directory):
+    task = TaskSpec(
+        task_id="scene-belief-demo",
+        objective="Move desk by window",
+        constraints=(),
+        seed=0,
+        config_id="scene-belief-v1",
+    )
+
+    def context(operation_id):
+        return OperationContext(
+            operation_id=operation_id,
+            task_id=task.task_id,
+            run_id="demo",
+            expected_environment_revision="fake-room-1",
+            fencing_token=1,
+        )
+
+    first = structured_observation(await FakeEnvironmentAdapter(1).observe(context("first")), 1)
+    second = structured_observation(await FakeEnvironmentAdapter(2).observe(context("second")), 2)
+    archive = InMemoryObservationArchive((first, second))
+    service = StructuredSceneBeliefService(archive.load)
+    before = await service.update(None, (first,), task)
+    after = await service.update(before, (second,), task)
+    replay = await service.update(None, (second, first), task)
+    assert service._content(replay) == service._content(after)
+
+    result = {
+        "before": before.model_dump(mode="json"),
+        "after": after.model_dump(mode="json"),
+        "replay_matches": True,
+    }
+    output = Path(directory)
+    output.mkdir(parents=True, exist_ok=True)
+    (output / "belief-demo.json").write_text(json.dumps(result, indent=2, ensure_ascii=False))
+    return result
 
 
 if __name__ == "__main__":
-    main()
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--output", default="output/scene-belief-demo")
+    result = asyncio.run(run(parser.parse_args().output))
+    print(
+        json.dumps(
+            {
+                "objects_before": [item["object_id"] for item in result["before"]["objects"]],
+                "objects_after": [item["object_id"] for item in result["after"]["objects"]],
+                "replay_matches": result["replay_matches"],
+            },
+            indent=2,
+        )
+    )

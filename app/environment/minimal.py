@@ -1,4 +1,4 @@
-"""Persistent minimal EnvironmentAdapter; no graph or business-service dependency."""
+"""Persistent minimal environment model with deterministic camera geometry."""
 from contextlib import contextmanager
 from datetime import datetime,timezone,timedelta
 from hashlib import sha256

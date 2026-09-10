@@ -1,0 +1,12 @@
+{
+  "agent_radius_m": 0.30,
+  "navigation_clearance_m": 0.05,
+  "grid_resolution_m": 0.05,
+  "default_approach_angle_deg": 35.0,
+  "default_reach_radius_m": 0.75,
+  "clearance_block_ratio_max": 0.0,
+  "distance_severity_scale_m": 0.30,
+  "angle_severity_scale_deg": 45.0,
+  "maximum_move_m": 2.0,
+  "maximum_iterations": 10
+}

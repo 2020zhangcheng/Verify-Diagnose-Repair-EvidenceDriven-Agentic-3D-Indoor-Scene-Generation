@@ -1,0 +1,44 @@
+{
+  "scene_id": "react-bad-scene-20260909",
+  "objects": [
+    {
+      "object_id": "crate_a",
+      "position_m": [2.0, 0.0, 0.5],
+      "size_m": [1.0, 1.0, 1.0],
+      "support_id": "floor"
+    },
+    {
+      "object_id": "crate_b",
+      "position_m": [2.7, 0.0, 0.5],
+      "size_m": [1.0, 1.0, 1.0],
+      "support_id": "floor"
+    },
+    {
+      "object_id": "floating_box",
+      "position_m": [-2.0, 0.0, 1.8],
+      "size_m": [0.8, 0.8, 0.8],
+      "support_id": "floor"
+    },
+    {
+      "object_id": "lamp",
+      "position_m": [0.0, -3.0, 0.0],
+      "size_m": [0.6, 0.6, 1.2],
+      "support_id": "floor"
+    },
+    {
+      "object_id": "pedestal",
+      "position_m": [-4.0, 0.0, 0.5],
+      "size_m": [1.2, 1.2, 1.0],
+      "support_id": "floor",
+      "movable": false,
+      "anchored": true,
+      "requires_support": false
+    },
+    {
+      "object_id": "vase",
+      "position_m": [-4.7, 0.0, 1.2],
+      "size_m": [0.4, 0.4, 0.4],
+      "support_id": "pedestal"
+    }
+  ]
+}

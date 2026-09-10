@@ -4,5 +4,8 @@ __pycache__/
 *.egg-info/
 .env
 outputs/
+output/
+*.DS_Store
+retry-*.json
 
 tmp/

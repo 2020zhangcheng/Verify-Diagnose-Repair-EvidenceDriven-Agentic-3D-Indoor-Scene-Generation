@@ -36,7 +36,7 @@ async def run(directory):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--output',default='outputs/simulation-belief-demo')
+    parser.add_argument('--output',default='output/simulation-belief-demo')
     result = asyncio.run(run(parser.parse_args().output))
     print(json.dumps({'objects_before':[o['object_id'] for o in result['before']['objects']],
                       'objects_after':[o['object_id'] for o in result['after']['objects']], 'replay_matches':result['replay_matches']},indent=2))

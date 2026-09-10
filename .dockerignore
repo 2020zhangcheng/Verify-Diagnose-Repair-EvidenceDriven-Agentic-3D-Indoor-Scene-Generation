@@ -8,4 +8,6 @@ __pycache__
 *.egg-info
 
 outputs
+output
+retry-*.json
 tmp

@@ -1,4 +1,4 @@
-"""Standalone adapter demo: real generated artifacts, no Planning/Memory/Graph."""
+"""Standalone demo for the restored deterministic environment model."""
 import argparse
 import asyncio
 import json
@@ -28,5 +28,5 @@ async def demo(directory):
 
 if __name__=='__main__':
     parser=argparse.ArgumentParser()
-    parser.add_argument('--output',default='outputs/environment-demo')
+    parser.add_argument('--output',default='output/environment-demo')
     asyncio.run(demo(parser.parse_args().output))
